@@ -1,7 +1,174 @@
-<html>
-    <h1> Hello World!!!! </h1>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Spades Score Sheet</title>
+  <style>
+    body {
+      background-color: #121212;
+      color: #e0e0e0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 20px;
+    }
+    h1, h2 {
+      color: #ffcc00;
+    }
+    .container {
+      max-width: 800px;
+      margin: auto;
+    }
+    input, button {
+      padding: 8px;
+      margin: 5px;
+      background: #222;
+      color: #fff;
+      border: 1px solid #444;
+      border-radius: 4px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    th, td {
+      border: 1px solid #444;
+      padding: 8px;
+      text-align: center;
+    }
+    th {
+      background-color: #333;
+    }
+    .highlight {
+      color: #76ff03;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Spades Score Sheet</h1>
+
     <div>
-        <img src="twd.jpg" height="150">
-    </div> 
-    
+      <label>Team 1 Name: <input id="team1" value="Team A" /></label>
+      <label>Team 2 Name: <input id="team2" value="Team B" /></label>
+    </div>
+
+    <div>
+      <h2>New Round</h2>
+      <form id="roundForm">
+        <table>
+          <tr><th></th><th>Bid</th><th>Tricks</th><th>Nil?</th><th>Blind Nil?</th></tr>
+          <tr><td>Player 1</td><td><input type="number" min="0" max="13" id="p1_bid"></td><td><input type="number" min="0" max="13" id="p1_tricks"></td><td><input type="checkbox" id="p1_nil"></td><td><input type="checkbox" id="p1_blind"></td></tr>
+          <tr><td>Player 2</td><td><input type="number" min="0" max="13" id="p2_bid"></td><td><input type="number" min="0" max="13" id="p2_tricks"></td><td><input type="checkbox" id="p2_nil"></td><td><input type="checkbox" id="p2_blind"></td></tr>
+          <tr><td>Player 3</td><td><input type="number" min="0" max="13" id="p3_bid"></td><td><input type="number" min="0" max="13" id="p3_tricks"></td><td><input type="checkbox" id="p3_nil"></td><td><input type="checkbox" id="p3_blind"></td></tr>
+          <tr><td>Player 4</td><td><input type="number" min="0" max="13" id="p4_bid"></td><td><input type="number" min="0" max="13" id="p4_tricks"></td><td><input type="checkbox" id="p4_nil"></td><td><input type="checkbox" id="p4_blind"></td></tr>
+        </table>
+        <button type="submit">Submit Round</button>
+      </form>
+    </div>
+
+    <h2>Scores</h2>
+    <p><span id="team1Name">Team A</span>: <span class="highlight" id="score1">0</span></p>
+    <p><span id="team2Name">Team B</span>: <span class="highlight" id="score2">0</span></p>
+
+    <table id="historyTable">
+      <thead>
+        <tr><th>Round</th><th>Team 1</th><th>Team 2</th></tr>
+      </thead>
+      <tbody id="history"></tbody>
+    </table>
+  </div>
+
+  <script>
+    const roundForm = document.getElementById('roundForm');
+    const historyBody = document.getElementById('history');
+    const team1Name = document.getElementById('team1Name');
+    const team2Name = document.getElementById('team2Name');
+    const team1Input = document.getElementById('team1');
+    const team2Input = document.getElementById('team2');
+    let rounds = JSON.parse(localStorage.getItem('spadesRounds') || '[]');
+
+    function calcScore(r) {
+      let team1 = [r.p1, r.p2];
+      let team2 = [r.p3, r.p4];
+
+      function scoreTeam(players) {
+        let bid = 0, tricks = 0, bags = 0, score = 0;
+        players.forEach(p => {
+          if (p.nil) {
+            if (p.tricks === 0) score += 100;
+            else score -= 100;
+          } else if (p.blind) {
+            if (p.tricks === 0) score += 100;
+            else score -= 100;
+          } else {
+            bid += p.bid;
+            tricks += p.tricks;
+          }
+        });
+        if (bid > 0) {
+          if (tricks >= bid) {
+            score += bid * 10;
+            bags = tricks - bid;
+            score += bags;
+          } else {
+            score -= bid * 10;
+          }
+        }
+        return { score, bags };
+      }
+
+      let s1 = scoreTeam(team1);
+      let s2 = scoreTeam(team2);
+      return [s1.score, s2.score];
+    }
+
+    function updateDisplay() {
+      let s1 = 0, s2 = 0;
+      historyBody.innerHTML = '';
+      rounds.forEach((r, i) => {
+        let [sc1, sc2] = calcScore(r);
+        s1 += sc1;
+        s2 += sc2;
+        let row = document.createElement('tr');
+        row.innerHTML = `<td>${i + 1}</td><td>${s1}</td><td>${s2}</td>`;
+        historyBody.appendChild(row);
+      });
+      document.getElementById('score1').textContent = s1;
+      document.getElementById('score2').textContent = s2;
+      team1Name.textContent = team1Input.value;
+      team2Name.textContent = team2Input.value;
+      if (s1 >= 500 || s2 >= 500) alert('Game Over!');
+    }
+
+    roundForm.onsubmit = (e) => {
+      e.preventDefault();
+      const get = id => ({
+        bid: +document.getElementById(`${id}_bid`).value || 0,
+        tricks: +document.getElementById(`${id}_tricks`).value || 0,
+        nil: document.getElementById(`${id}_nil`).checked,
+        blind: document.getElementById(`${id}_blind`).checked
+      });
+      let round = { p1: get('p1'), p2: get('p2'), p3: get('p3'), p4: get('p4') };
+      // Blind nil check
+      let total = rounds.reduce((acc, r) => {
+        let [s1, s2] = calcScore(r);
+        acc[0] += s1; acc[1] += s2; return acc;
+      }, [0, 0]);
+      [round.p1, round.p2, round.p3, round.p4].forEach(p => {
+        if (p.blind && Math.min(...total) > -200) p.blind = false;
+      });
+      rounds.push(round);
+      localStorage.setItem('spadesRounds', JSON.stringify(rounds));
+      updateDisplay();
+      roundForm.reset();
+    };
+
+    team1Input.addEventListener('input', updateDisplay);
+    team2Input.addEventListener('input', updateDisplay);
+
+    updateDisplay();
+  </script>
+</body>
 </html>
